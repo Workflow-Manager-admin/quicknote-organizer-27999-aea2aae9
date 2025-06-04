@@ -1,101 +1,306 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+
+interface Note {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// PUBLIC_INTERFACE
+export default function QuickNoteOrganizer() {
+  /**
+   * Main container component for QuickNote Organizer application.
+   * Provides functionality for creating, editing, deleting, and searching notes.
+   */
+  
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalContent, setModalContent] = useState('');
+
+  // Load notes from localStorage on component mount
+  useEffect(() => {
+    const savedNotes = localStorage.getItem('quicknotes');
+    if (savedNotes) {
+      try {
+        const parsedNotes = JSON.parse(savedNotes).map((note: any) => ({
+          ...note,
+          createdAt: new Date(note.createdAt),
+          updatedAt: new Date(note.updatedAt)
+        }));
+        setNotes(parsedNotes);
+      } catch (error) {
+        console.error('Error loading notes from localStorage:', error);
+      }
+    }
+  }, []);
+
+  // Save notes to localStorage whenever notes change
+  useEffect(() => {
+    localStorage.setItem('quicknotes', JSON.stringify(notes));
+  }, [notes]);
+
+  // Filter notes based on search term
+  const filteredNotes = notes.filter(note =>
+    note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    note.content.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // PUBLIC_INTERFACE
+  const openCreateModal = () => {
+    /**
+     * Opens the modal for creating a new note.
+     */
+    setEditingNote(null);
+    setModalTitle('');
+    setModalContent('');
+    setIsModalOpen(true);
+  };
+
+  // PUBLIC_INTERFACE
+  const openEditModal = (note: Note) => {
+    /**
+     * Opens the modal for editing an existing note.
+     */
+    setEditingNote(note);
+    setModalTitle(note.title);
+    setModalContent(note.content);
+    setIsModalOpen(true);
+  };
+
+  // PUBLIC_INTERFACE
+  const closeModal = () => {
+    /**
+     * Closes the note creation/editing modal.
+     */
+    setIsModalOpen(false);
+    setEditingNote(null);
+    setModalTitle('');
+    setModalContent('');
+  };
+
+  // PUBLIC_INTERFACE
+  const saveNote = () => {
+    /**
+     * Saves a new note or updates an existing note.
+     */
+    if (!modalTitle.trim()) {
+      alert('Please enter a note title');
+      return;
+    }
+
+    const now = new Date();
+
+    if (editingNote) {
+      // Update existing note
+      setNotes(notes.map(note =>
+        note.id === editingNote.id
+          ? { ...note, title: modalTitle, content: modalContent, updatedAt: now }
+          : note
+      ));
+    } else {
+      // Create new note
+      const newNote: Note = {
+        id: Date.now().toString(),
+        title: modalTitle,
+        content: modalContent,
+        createdAt: now,
+        updatedAt: now
+      };
+      setNotes([newNote, ...notes]);
+    }
+
+    closeModal();
+  };
+
+  // PUBLIC_INTERFACE
+  const deleteNote = (noteId: string) => {
+    /**
+     * Deletes a note after user confirmation.
+     */
+    if (window.confirm('Are you sure you want to delete this note?')) {
+      setNotes(notes.filter(note => note.id !== noteId));
+    }
+  };
+
+  // PUBLIC_INTERFACE
+  const formatDate = (date: Date) => {
+    /**
+     * Formats a date for display in the note list.
+     */
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+
+  // PUBLIC_INTERFACE
+  const truncateContent = (content: string, maxLength: number = 100) => {
+    /**
+     * Truncates note content for display in the list view.
+     */
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + '...';
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+    <div className="min-h-screen bg-white">
+      {/* Header with Search Bar */}
+      <header className="sticky top-0 bg-white border-b border-gray-200 z-10">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4" style={{ color: 'var(--primary)' }}>
+            📝 QuickNote Organizer
+          </h1>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search notes..."
+              className="search-bar w-full pl-10"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+              🔍
+            </div>
+          </div>
         </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-4xl mx-auto px-4 py-6 pb-20">
+        {filteredNotes.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">📝</div>
+            <h2 className="empty-state-title">
+              {searchTerm ? 'No notes found' : 'No notes yet'}
+            </h2>
+            <p className="empty-state-description">
+              {searchTerm 
+                ? `No notes match "${searchTerm}". Try a different search term.`
+                : 'Start organizing your thoughts by creating your first note!'
+              }
+            </p>
+            {!searchTerm && (
+              <button 
+                className="btn btn-primary mt-4"
+                onClick={openCreateModal}
+              >
+                Create Your First Note
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="notes-grid">
+            {filteredNotes.map((note) => (
+              <div key={note.id} className="note-card">
+                <div onClick={() => openEditModal(note)}>
+                  <h3 className="note-title">{note.title}</h3>
+                  {note.content && (
+                    <p className="note-content">
+                      {truncateContent(note.content)}
+                    </p>
+                  )}
+                  <div className="text-xs text-gray-500 mb-3">
+                    Last updated: {formatDate(note.updatedAt)}
+                  </div>
+                </div>
+                <div className="note-actions">
+                  <button
+                    className="btn btn-primary"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditModal(note);
+                    }}
+                  >
+                    ✏️ Edit
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteNote(note.id);
+                    }}
+                  >
+                    🗑️ Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+      {/* Floating Action Button */}
+      <button
+        className="floating-action-btn"
+        onClick={openCreateModal}
+        title="Add new note"
+      >
+        +
+      </button>
+
+      {/* Modal for Creating/Editing Notes */}
+      {isModalOpen && (
+        <div className="modal-overlay" onClick={closeModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal-title">
+              {editingNote ? 'Edit Note' : 'Create New Note'}
+            </h2>
+            
+            <div className="form-group">
+              <label className="form-label" htmlFor="note-title">
+                Title *
+              </label>
+              <input
+                id="note-title"
+                type="text"
+                className="form-input"
+                placeholder="Enter note title..."
+                value={modalTitle}
+                onChange={(e) => setModalTitle(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="note-content">
+                Content
+              </label>
+              <textarea
+                id="note-content"
+                className="form-textarea"
+                placeholder="Enter note content..."
+                value={modalContent}
+                onChange={(e) => setModalContent(e.target.value)}
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn btn-secondary"
+                onClick={closeModal}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={saveNote}
+              >
+                {editingNote ? 'Update Note' : 'Create Note'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
